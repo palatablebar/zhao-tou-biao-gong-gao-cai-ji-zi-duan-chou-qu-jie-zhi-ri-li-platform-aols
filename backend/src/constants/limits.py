@@ -1,0 +1,13 @@
+"""限流 / 分页 / 采集配额常量。"""
+from __future__ import annotations
+
+RATE_WINDOW_SECONDS = 60
+CRAWL_BUCKET_KEY = "crawl"
+
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100
+REVIEW_QUEUE_LIMIT = 200
+
+MAX_TEMPLATE_RULES = 40
+MAX_FIELD_VALUE_LENGTH = 255
+MAX_CRAWL_SITES = 6

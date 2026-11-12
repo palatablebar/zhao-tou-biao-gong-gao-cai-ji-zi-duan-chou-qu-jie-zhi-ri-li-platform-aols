@@ -1,0 +1,38 @@
+/* 档案室卷宗风：牛皮纸底 + 深墨绿墨迹 + 朱红印章 + 黄铜编号 */
+:root {
+  --paper: oklch(0.905 0.028 80);
+  --paper-2: oklch(0.874 0.032 78);
+  --paper-3: oklch(0.836 0.036 76);
+  --sheet: oklch(0.948 0.019 84);
+  --sheet-2: oklch(0.928 0.022 82);
+
+  --ink: oklch(0.29 0.038 158);
+  --ink-deep: oklch(0.215 0.03 158);
+  --ink-soft: oklch(0.452 0.028 156);
+  --ink-faint: oklch(0.628 0.021 148);
+
+  --seal: oklch(0.5 0.17 30);
+  --seal-deep: oklch(0.43 0.16 30);
+  --seal-soft: oklch(0.902 0.046 36);
+
+  --brass: oklch(0.585 0.088 78);
+  --brass-soft: oklch(0.918 0.038 82);
+  --brass-line: oklch(0.79 0.05 80);
+
+  --line: oklch(0.792 0.022 80);
+  --line-strong: oklch(0.638 0.03 78);
+  --shadow-folio: 0 1px 0 oklch(0.78 0.02 80 / 0.6), 0 14px 30px -26px oklch(0.28 0.03 70 / 0.55);
+
+  --font-display: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;
+
+  --step--1: clamp(0.76rem, 0.73rem + 0.12vw, 0.84rem);
+  --step-0: clamp(0.9rem, 0.86rem + 0.16vw, 1rem);
+  --step-1: clamp(1.04rem, 0.97rem + 0.3vw, 1.2rem);
+  --step-2: clamp(1.28rem, 1.14rem + 0.62vw, 1.62rem);
+  --step-3: clamp(1.66rem, 1.38rem + 1.2vw, 2.32rem);
+  --step-4: clamp(2.1rem, 1.6rem + 2.4vw, 3.3rem);
+
+  --radius: 2px;
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
