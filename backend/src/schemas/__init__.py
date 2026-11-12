@@ -40,6 +40,12 @@ class TemplateCreateIn(BaseModel):
     field_rules: dict | None = None
 
 
+class PublishIn(BaseModel):
+    """发布时用于复现风险评分口径的基准时刻；缺省用演示基准。"""
+
+    as_of: str | None = None
+
+
 class CrawlStartIn(BaseModel):
     site_ids: list[int] | None = None
     as_of: str | None = None

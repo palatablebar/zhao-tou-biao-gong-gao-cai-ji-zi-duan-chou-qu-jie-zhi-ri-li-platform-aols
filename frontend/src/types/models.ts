@@ -79,6 +79,75 @@ export interface TemplateCompare {
   diffs: TemplateDiff[];
 }
 
+export interface PublishFieldSummary {
+  field_key: FieldKey;
+  label: string;
+  created: number;
+  updated: number;
+  unchanged: number;
+  preserved: number;
+  changed_value: number;
+}
+
+export interface PublishFieldChange {
+  notice_id: number;
+  external_id: string;
+  title: string;
+  field_key: FieldKey;
+  label: string;
+  action: 'create' | 'update';
+  status_before?: FieldStatus | null;
+  status_after?: FieldStatus | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  old_confidence?: number | null;
+  new_confidence?: number | null;
+}
+
+export interface PublishPendingDate {
+  notice_id: number;
+  external_id: string;
+  title: string;
+  kind: DeadlineKind;
+  reason?: string | null;
+}
+
+/** GET /templates/{id}/publish-preview 与 POST /templates/{id}/publish 共用响应。 */
+export interface PublishImpact {
+  applied: boolean;
+  as_of: string;
+  site: { id: number; name: string; domain: string };
+  template: { id: number; name: string; version: number; status: TemplateStatus };
+  previous: { id: number; name: string; version: number } | null;
+  notice_count: number;
+  affected_notice_count: number;
+  field_summary: {
+    total: number;
+    created: number;
+    updated: number;
+    unchanged: number;
+    preserved_manual: number;
+    changed_value: number;
+    by_field: PublishFieldSummary[];
+  };
+  field_changes: PublishFieldChange[];
+  field_changes_truncated: boolean;
+  deadline_summary: {
+    event_count: number;
+    rescored: number;
+    event_at_changed: number;
+    risk_changed: number;
+    pending_date_count: number;
+    risk_before: Record<RiskLevel, number>;
+    risk_after: Record<RiskLevel, number>;
+  };
+  pending_dates: PublishPendingDate[];
+  pending_dates_truncated: boolean;
+  archived?: number[];
+  /** 重复发布已生效版本时为 true：没有重算、没有新增记录。 */
+  noop?: boolean;
+}
+
 export interface CrawlRun {
   id: number;
   status: RunStatus;

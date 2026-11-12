@@ -12,5 +12,6 @@ ERROR_CODES: dict[str, str] = {
     "CRAWL_BUSY": "已有采集批次在执行中",
     "FIELD_LOCKED": "已复核字段不允许再次修改",
     "TEMPLATE_STATE": "模板当前状态不允许该操作",
+    "PUBLISH_FAILED": "模板发布失败，已保留上一版",
     "INTERNAL": "服务内部错误",
 }

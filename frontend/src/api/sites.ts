@@ -1,5 +1,5 @@
 import { http } from './client';
-import type { Site, Template, TemplateCompare, TemplateDiff } from '../types/models';
+import type { PublishImpact, Site, Template, TemplateCompare, TemplateDiff } from '../types/models';
 
 export const siteApi = {
   list: () => http.get<{ items: Site[] }>('/sites'),
@@ -14,8 +14,12 @@ export const templateApi = {
     ),
   create: (payload: Record<string, unknown>) =>
     http.post<{ template: Template }>('/templates', payload),
-  publish: (templateId: number) =>
-    http.post<{ template: Template; archived: number[] }>(`/templates/${templateId}/publish`),
+  previewPublish: (templateId: number, asOf?: string) =>
+    http.get<PublishImpact>(
+      `/templates/${templateId}/publish-preview${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ''}`,
+    ),
+  publish: (templateId: number, asOf?: string) =>
+    http.post<PublishImpact>(`/templates/${templateId}/publish`, asOf ? { as_of: asOf } : {}),
   compare: (left: number, right: number) =>
     http.get<TemplateCompare & { diffs: TemplateDiff[] }>(`/templates/compare?left=${left}&right=${right}`),
 };

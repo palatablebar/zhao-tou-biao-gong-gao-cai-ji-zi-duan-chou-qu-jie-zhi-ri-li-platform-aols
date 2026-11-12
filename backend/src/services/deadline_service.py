@@ -52,35 +52,56 @@ def resolve_as_of(value: str | None) -> datetime:
     return parsed or demo_as_of()
 
 
-def score_event(event: DeadlineEvent, notice: Notice, as_of: datetime) -> None:
-    gap = QUALIFY_GAP.get(notice.qualification, 0.0)
-    event.qualify_gap = round(gap, 3)
-    event.computed_at = as_of
-    if event.event_at is None:
-        event.work_hours_remaining = None
-        event.deadline_pressure = None
-        event.risk_score = None
-        event.risk_level = RiskLevel.UNKNOWN.value
-        event.note = "报名截止时间缺失（原文为「另行通知」类占位），不参与分档，待人工补全"
-        return
-    hours = work_hours_between(as_of, event.event_at)
+SCORE_FIELDS = (
+    "work_hours_remaining",
+    "deadline_pressure",
+    "qualify_gap",
+    "risk_score",
+    "risk_level",
+    "note",
+)
+
+
+def score_values(event_at: datetime | None, qualification: str, as_of: datetime) -> dict:
+    """纯函数评分：发布前预览用同一口径试算，不修改 ORM 对象。"""
+    gap = QUALIFY_GAP.get(qualification, 0.0)
+    values: dict = {
+        "work_hours_remaining": None,
+        "deadline_pressure": None,
+        "qualify_gap": round(gap, 3),
+        "risk_score": None,
+        "risk_level": RiskLevel.UNKNOWN.value,
+        "note": "报名截止时间缺失（原文为「另行通知」类占位），不参与分档，待人工补全",
+        "computed_at": as_of,
+    }
+    if event_at is None:
+        return values
+    hours = work_hours_between(as_of, event_at)
     pressure = round(min(1.0, max(0.0, 1.0 - hours / settings.pressure_horizon_hours)), 3)
     score = round(100.0 * (0.62 * pressure + 0.38 * (1.0 - gap)), 1)
-    event.work_hours_remaining = hours
-    event.deadline_pressure = pressure
-    event.risk_score = score
+    values["work_hours_remaining"] = hours
+    values["deadline_pressure"] = pressure
+    values["risk_score"] = score
     if gap >= 0.5:
-        event.risk_level = RiskLevel.SKIP.value
-        event.note = f"资质门槛超出（{QUAL_LABEL.get(notice.qualification, notice.qualification)}），不投标"
+        values["risk_level"] = RiskLevel.SKIP.value
+        values["note"] = f"资质门槛超出（{QUAL_LABEL.get(qualification, qualification)}），不投标"
     elif pressure >= settings.must_act_pressure:
-        event.risk_level = RiskLevel.MUST_ACT.value
-        event.note = f"剩余 {hours} 工作小时，需本周报名"
+        values["risk_level"] = RiskLevel.MUST_ACT.value
+        values["note"] = f"剩余 {hours} 工作小时，需本周报名"
     elif pressure >= settings.watch_pressure:
-        event.risk_level = RiskLevel.WATCH.value
-        event.note = f"剩余 {hours} 工作小时，保持观察"
+        values["risk_level"] = RiskLevel.WATCH.value
+        values["note"] = f"剩余 {hours} 工作小时，保持观察"
     else:
-        event.risk_level = RiskLevel.SKIP.value
-        event.note = f"剩余 {hours} 工作小时，时间充裕，本周不排"
+        values["risk_level"] = RiskLevel.SKIP.value
+        values["note"] = f"剩余 {hours} 工作小时，时间充裕，本周不排"
+    return values
+
+
+def score_event(event: DeadlineEvent, notice: Notice, as_of: datetime) -> None:
+    values = score_values(event.event_at, notice.qualification, as_of)
+    for field_name in SCORE_FIELDS:
+        setattr(event, field_name, values[field_name])
+    event.computed_at = as_of
 
 
 def recompute_events(db: Session, as_of: datetime | None = None) -> dict:

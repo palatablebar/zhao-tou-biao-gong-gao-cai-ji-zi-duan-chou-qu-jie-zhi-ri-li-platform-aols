@@ -9,6 +9,7 @@ const CODE_MESSAGE: Record<string, string> = {
   CRAWL_BUSY: '已有采集批次正在执行',
   FIELD_LOCKED: '该字段已锁定，不能再次修改',
   TEMPLATE_STATE: '模板当前状态不允许该操作',
+  PUBLISH_FAILED: '发布失败，已保留上一版',
   RATE_LIMITED: '操作过于频繁，请稍后再试',
   VALIDATION: '提交内容不合法',
   INTERNAL: '服务内部错误，请稍后重试',

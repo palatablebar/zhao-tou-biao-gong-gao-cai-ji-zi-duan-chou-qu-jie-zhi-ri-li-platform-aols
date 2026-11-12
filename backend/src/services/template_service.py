@@ -10,7 +10,7 @@ from src.constants.limits import MAX_TEMPLATE_RULES
 from src.models.site import Site
 from src.models.template import ExtractionTemplate
 from src.utils.errors import AppError
-from src.utils.timeutil import iso_local, now_local
+from src.utils.timeutil import iso_local
 
 
 def default_rules() -> dict:
@@ -131,27 +131,6 @@ def create_template(db: Session, payload: dict, actor_email: str) -> dict:
     db.add(template)
     db.flush()
     return serialize_template(db, template)
-
-
-def publish_template(db: Session, template_id: int, actor_email: str) -> dict:
-    template = db.get(ExtractionTemplate, template_id)
-    if template is None:
-        raise AppError("NOT_FOUND", 404, detail=f"template_id={template_id}")
-    if template.status == TemplateStatus.ACTIVE.value:
-        raise AppError("TEMPLATE_STATE", 409, detail="该版本已是生效版本")
-    others = db.scalars(
-        select(ExtractionTemplate).where(
-            ExtractionTemplate.site_id == template.site_id,
-            ExtractionTemplate.name == template.name,
-            ExtractionTemplate.status == TemplateStatus.ACTIVE.value,
-        )
-    ).all()
-    for other in others:
-        other.status = TemplateStatus.ARCHIVED.value
-    template.status = TemplateStatus.ACTIVE.value
-    template.published_at = now_local()
-    db.flush()
-    return {"template": serialize_template(db, template), "archived": [item.id for item in others]}
 
 
 def compare_templates(db: Session, left_id: int, right_id: int) -> dict:

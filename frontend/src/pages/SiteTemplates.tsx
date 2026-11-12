@@ -6,11 +6,11 @@ import Stamp from '../components/common/Stamp';
 import { useAsync } from '../hooks/useAsync';
 import { useAuth } from '../router/guards';
 import { can } from '../constants/roles';
-import { SITE_STATUS_LABEL, TEMPLATE_STATUS_LABEL } from '../constants/enums';
+import { FIELD_STATUS_LABEL, RISK_LABEL, SITE_STATUS_LABEL, TEMPLATE_STATUS_LABEL } from '../constants/enums';
 import { uiStore } from '../stores/uiStore';
 import { errorMessage } from '../utils/errorMessage';
 import { fmtDateTime, fmtNumber } from '../utils/format';
-import type { Template, TemplateCompare } from '../types/models';
+import type { PublishImpact, RiskLevel, Template, TemplateCompare } from '../types/models';
 
 export default function SiteTemplates() {
   const auth = useAuth();
@@ -23,6 +23,11 @@ export default function SiteTemplates() {
   const [rightId, setRightId] = useState<number | null>(null);
   const [compareData, setCompareData] = useState<TemplateCompare | null>(null);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<PublishImpact | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<Template | null>(null);
+  const [publishResult, setPublishResult] = useState<PublishImpact | null>(null);
+  const [ruleBase, setRuleBase] = useState<Template | null>(null);
+  const [ruleAnchors, setRuleAnchors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (siteId === null && sites.data && sites.data.items.length > 0) {
@@ -37,39 +42,98 @@ export default function SiteTemplates() {
     setLeftId(null);
     setRightId(null);
     setCompareData(null);
+    setPreview(null);
+    setPreviewTarget(null);
+    setPublishResult(null);
+    setRuleBase(null);
   }, [siteId]);
 
-  async function publish(template: Template) {
+  async function loadPreview(template: Template) {
     setBusy(true);
     try {
-      const result = await templateApi.publish(template.id);
-      uiStore.push('ok', `模板「${result.template.name}」v${result.template.version} 已生效`);
+      const result = await templateApi.previewPublish(template.id);
+      setPreview(result);
+      setPreviewTarget(template);
+      setPublishResult(null);
+    } catch (error) {
+      uiStore.push('error', errorMessage(error, '发布预演失败'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publish() {
+    if (!previewTarget) return;
+    setBusy(true);
+    try {
+      const result = await templateApi.publish(previewTarget.id);
+      setPreview(result);
+      setPublishResult(result);
+      uiStore.push(
+        result.noop ? 'warn' : 'ok',
+        result.noop
+          ? `模板 v${result.template.version} 已是生效版本，未做重复重算`
+          : `模板 v${result.template.version} 已生效：重算 ${result.affected_notice_count} 条公告、` +
+            `保留人工值 ${result.field_summary.preserved_manual} 个字段、待补日期 ${result.deadline_summary.pending_date_count} 个`,
+      );
       templates.reload();
       sites.reload();
     } catch (error) {
+      setPreview(null);
+      setPreviewTarget(null);
       uiStore.push('error', errorMessage(error, '发布失败'));
     } finally {
       setBusy(false);
     }
   }
 
-  async function createDraft(base: Template) {
+  function startRuleEdit(base: Template) {
+    const initial: Record<string, string> = {};
+    Object.entries(base.field_rules ?? {}).forEach(([key, rule]) => {
+      initial[key] = (rule.anchors ?? []).join('、');
+    });
+    setRuleBase(base);
+    setRuleAnchors(initial);
+    setPreview(null);
+    setPreviewTarget(null);
+    setPublishResult(null);
+  }
+
+  function parseAnchors(text: string): string[] {
+    return text
+      .split(/[、,，\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  async function createDraft(base: Template, fieldRules: Record<string, unknown>) {
     setBusy(true);
     try {
       const result = await templateApi.create({
         site_id: base.site_id,
         name: base.name,
-        change_note: `由 v${base.version} 复制出的草稿，待补充锚点`,
+        change_note: `由 v${base.version} 调整锚点生成的草稿`,
         coverage_score: base.coverage_score,
-        field_rules: base.field_rules,
+        field_rules: fieldRules,
       });
-      uiStore.push('ok', `已创建草稿 v${result.template.version}`);
+      uiStore.push('ok', `已创建草稿 v${result.template.version}，正在试算发布影响`);
       templates.reload();
+      await loadPreview(result.template);
     } catch (error) {
       uiStore.push('error', errorMessage(error, '创建草稿失败'));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveRuleDraft() {
+    if (!ruleBase) return;
+    const rules: Record<string, unknown> = {};
+    Object.entries(ruleBase.field_rules ?? {}).forEach(([key, rule]) => {
+      rules[key] = { anchors: parseAnchors(ruleAnchors[key] ?? ''), patterns: rule.patterns ?? [] };
+    });
+    await createDraft(ruleBase, rules);
+    setRuleBase(null);
   }
 
   async function compare() {
@@ -161,8 +225,8 @@ export default function SiteTemplates() {
               <EmptyState
                 title="该站点还没有模板"
                 hint="先以默认规则创建一个草稿版本，再发布为生效版本，采集批次就会用它抽取字段。"
-                actionLabel={canWrite && siteTemplates[0] ? '新建草稿' : undefined}
-                onAction={canWrite && siteTemplates[0] ? () => createDraft(siteTemplates[0]) : undefined}
+                actionLabel={canWrite && siteTemplates[0] ? '调整规则' : undefined}
+                onAction={canWrite && siteTemplates[0] ? () => startRuleEdit(siteTemplates[0]) : undefined}
               />
             ) : (
               <table className="data">
@@ -196,13 +260,18 @@ export default function SiteTemplates() {
                       </td>
                       <td className="actions-cell">
                         {canPublish && template.status === 'draft' ? (
-                          <button className="btn btn-sm btn-primary" type="button" onClick={() => publish(template)} disabled={busy}>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            type="button"
+                            onClick={() => loadPreview(template)}
+                            disabled={busy || previewTarget?.id === template.id}
+                          >
                             发布生效
                           </button>
                         ) : null}
                         {canWrite ? (
-                          <button className="btn btn-sm btn-ghost" type="button" onClick={() => createDraft(template)} disabled={busy}>
-                            复制为草稿
+                          <button className="btn btn-sm btn-ghost" type="button" onClick={() => startRuleEdit(template)} disabled={busy}>
+                            调整规则
                           </button>
                         ) : null}
                       </td>
@@ -212,6 +281,181 @@ export default function SiteTemplates() {
               </table>
             )}
           </section>
+
+          {ruleBase ? (
+            <section className="panel" data-testid="rule-editor">
+              <div className="panel-head">
+                <h2>调整锚点 · 基于 v{ruleBase.version}</h2>
+                <span className="meta mono">用「、」分隔；保存后生成草稿并试算影响</span>
+              </div>
+              <div className="rule-grid">
+                {Object.entries(ruleBase.field_rules ?? {}).map(([key, rule]) => (
+                  <label key={key}>
+                    <span>{rule.label ?? key}</span>
+                    <input
+                      className="input mono"
+                      value={ruleAnchors[key] ?? ''}
+                      onChange={(event) => setRuleAnchors({ ...ruleAnchors, [key]: event.target.value })}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="impact-actions">
+                <span className="readonly-hint mono">草稿不会立即生效；试算只读，确认后才切换</span>
+                <button className="btn btn-sm btn-ghost" type="button" onClick={() => setRuleBase(null)} disabled={busy}>
+                  取消
+                </button>
+                <button className="btn btn-sm btn-primary" type="button" onClick={saveRuleDraft} disabled={busy}>
+                  保存为草稿并试算
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {preview && previewTarget ? (
+            <section className="panel publish-impact" data-testid="publish-impact">
+              <div className="panel-head">
+                <h2>发布影响 · v{preview.template.version}</h2>
+                <span className="meta mono">
+                  {publishResult ? '已切换生效' : '预演结果 · 未写入'} · 基准 {preview.as_of.slice(0, 16)}
+                </span>
+              </div>
+              <div className="impact-scope">
+                <div>
+                  <span className="k">采源</span>
+                  <span className="v mono">{preview.site.domain}</span>
+                </div>
+                <div>
+                  <span className="k">上一版</span>
+                  <span className="v mono">{preview.previous ? `v${preview.previous.version}` : '无'}</span>
+                </div>
+                <div>
+                  <span className="k">历史公告</span>
+                  <span className="v mono">{preview.notice_count} 条</span>
+                </div>
+                <div>
+                  <span className="k">受影响公告</span>
+                  <span className="v mono">{preview.affected_notice_count} 条</span>
+                </div>
+                <div>
+                  <span className="k">字段变化</span>
+                  <span className="v mono">{preview.field_summary.changed_value} 个</span>
+                </div>
+                <div>
+                  <span className="k">人工保留</span>
+                  <span className="v mono">{preview.field_summary.preserved_manual} 个</span>
+                </div>
+                <div>
+                  <span className="k">待补日期</span>
+                  <span className="v mono">{preview.deadline_summary.pending_date_count} 个</span>
+                </div>
+              </div>
+
+              <div className="impact-grid">
+                <div className="impact-block">
+                  <h3>字段变化</h3>
+                  {preview.field_changes.length === 0 ? (
+                    <p className="panel-loading">按新规则重算后没有字段值变化。</p>
+                  ) : (
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>公告</th>
+                          <th>字段</th>
+                          <th>原文 → 归一值</th>
+                          <th className="num">置信度</th>
+                          <th>状态</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.field_changes.map((change) => (
+                          <tr key={`${change.notice_id}-${change.field_key}`}>
+                            <td className="wrap small">
+                              {change.title}
+                              <span className="mono conf-sub">{change.external_id}</span>
+                            </td>
+                            <td>{change.label}</td>
+                            <td className="wrap small">
+                              <span className="impact-old">{change.old_value ?? '空'}</span>
+                              <span className="impact-arrow mono">→</span>
+                              <span className="impact-new">{change.new_value ?? '空'}</span>
+                            </td>
+                            <td className="num mono small">
+                              {fmtNumber(change.old_confidence ?? 0, 2)} → {fmtNumber(change.new_confidence ?? 0, 2)}
+                            </td>
+                            <td className="small">
+                              {change.status_before ? FIELD_STATUS_LABEL[change.status_before] : '新建'}
+                              {change.status_before && change.status_after !== change.status_before
+                                ? ` → ${FIELD_STATUS_LABEL[change.status_after ?? 'extracted']}`
+                                : ''}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {preview.field_changes_truncated ? (
+                    <p className="panel-foot">仅展示前 {preview.field_changes.length} 条，汇总计数不受影响。</p>
+                  ) : null}
+                </div>
+
+                <div className="impact-block">
+                  <h3>截止风险</h3>
+                  <div className="impact-risk">
+                    {(Object.keys(RISK_LABEL) as RiskLevel[]).map((level) => (
+                      <div key={level} className="impact-risk-row mono">
+                        <span className={`impact-risk-tag impact-risk-${level}`}>{RISK_LABEL[level]}</span>
+                        <span>{preview.deadline_summary.risk_before[level] ?? 0}</span>
+                        <span className="impact-arrow">→</span>
+                        <span>{preview.deadline_summary.risk_after[level] ?? 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="panel-loading">
+                    截止事件 {preview.deadline_summary.event_count} 个 · 重算 {preview.deadline_summary.rescored} 个 ·
+                    截止时间变化 {preview.deadline_summary.event_at_changed} 个 · 档位变化 {preview.deadline_summary.risk_changed} 个
+                  </p>
+
+                  <h3>待补日期</h3>
+                  {preview.pending_dates.length === 0 ? (
+                    <p className="panel-loading">没有缺失截止时间的公告。</p>
+                  ) : (
+                    <ul className="pending-date-list">
+                      {preview.pending_dates.map((item) => (
+                        <li key={`${item.notice_id}-${item.kind}`}>
+                          <span className="mono small">{item.external_id}</span>
+                          <span className="wrap small">{item.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {preview.pending_dates_truncated ? (
+                    <p className="panel-foot">仅展示前 {preview.pending_dates.length} 条。</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="impact-actions">
+                {publishResult ? (
+                  <span className="readonly-hint mono">
+                    已归档旧版 {publishResult.archived?.length ?? 0} 个 · 人工修正/通过字段已原样保留
+                  </span>
+                ) : (
+                  <span className="readonly-hint mono">
+                    发布将在同一事务内重算该中心历史公告与截止风险，失败自动回滚并保留上一版
+                  </span>
+                )}
+                <button className="btn btn-sm btn-ghost" type="button" onClick={() => { setPreview(null); setPreviewTarget(null); setPublishResult(null); }} disabled={busy}>
+                  收起
+                </button>
+                {!publishResult ? (
+                  <button className="btn btn-sm btn-primary" type="button" onClick={publish} disabled={busy}>
+                    确认发布并切换
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           <section className="panel">
             <div className="panel-head">

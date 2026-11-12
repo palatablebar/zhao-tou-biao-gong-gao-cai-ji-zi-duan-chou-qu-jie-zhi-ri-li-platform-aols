@@ -475,6 +475,40 @@ table.ledger td.deadline-cell { white-space: nowrap; font-size: 0.74rem; }
 .actions-cell .btn { margin-right: 0.3rem; }
 .compare-bar { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; padding: 0.6rem 0.9rem; border-bottom: 1px dashed var(--line); background: var(--sheet-2); }
 .compare-bar .input { width: auto; min-width: 190px; padding: 0.3rem 0.45rem; font-size: 0.74rem; }
+
+/* ============ 发布影响（模板切换预演） ============ */
+.publish-impact { border-left: 3px solid var(--seal); }
+.impact-scope {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  background: var(--sheet-2);
+}
+.impact-scope > div { padding: 0.5rem 0.7rem; border-right: 1px solid var(--line); min-width: 0; }
+.impact-scope > div:last-child { border-right: none; }
+.impact-scope .k { display: block; font-size: 0.58rem; letter-spacing: 0.14em; color: var(--ink-soft); text-transform: uppercase; }
+.impact-scope .v { font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.impact-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 1rem; padding: 0.8rem 0.9rem; }
+.impact-block h3 { font-size: var(--step-0); margin-bottom: 0.45rem; }
+.impact-block h3:not(:first-child) { margin-top: 0.9rem; }
+.impact-old { color: var(--ink-soft); text-decoration: line-through; }
+.impact-new { color: var(--ink-deep); font-weight: 600; }
+.impact-arrow { margin: 0 0.35rem; color: var(--brass); }
+.impact-risk { display: grid; gap: 0.25rem; }
+.impact-risk-row { display: grid; grid-template-columns: 5.6rem auto auto auto; gap: 0.5rem; align-items: baseline; font-size: 0.74rem; }
+.impact-risk-row span:not(.impact-risk-tag):not(.impact-arrow) { font-variant-numeric: tabular-nums; }
+.impact-risk-tag { font-size: 0.6rem; border: 1px solid currentColor; padding: 0 0.28rem; letter-spacing: 0.06em; color: var(--ink-soft); }
+.impact-risk-must_act { color: var(--seal); }
+.impact-risk-watch { color: var(--brass); }
+.impact-risk-skip { color: var(--ink-faint); }
+.impact-risk-unknown { color: var(--ink-soft); border-style: dashed; }
+.pending-date-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
+.pending-date-list li { display: grid; grid-template-columns: 9.2rem minmax(0, 1fr); gap: 0.4rem; align-items: baseline; padding: 0.26rem 0; border-bottom: 1px dashed var(--line); }
+.impact-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; padding: 0.6rem 0.9rem; border-top: 1px solid var(--line-strong); background: var(--sheet-2); }
+.impact-actions .readonly-hint { margin-right: auto; }
+.rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 0.9rem; padding: 0.8rem 0.9rem; }
+.rule-grid label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.64rem; color: var(--ink-soft); }
+.rule-grid .input { font-size: 0.74rem; padding: 0.3rem 0.45rem; }
 .compare-summary { font-size: 0.66rem; color: var(--ink-soft); }
 .compare-table code { display: inline-block; margin: 0 0.15rem 0.15rem 0; padding: 0 0.25rem; font-size: 0.68rem; border: 1px solid var(--line); }
 .anchor-add { color: var(--ink); background: oklch(0.9 0.03 150 / 0.5); }
@@ -583,6 +617,8 @@ table.ledger td.deadline-cell { white-space: nowrap; font-size: 0.74rem; }
 @media (max-width: 1380px) {
   .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .detail-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .impact-scope { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .impact-grid { grid-template-columns: minmax(0, 1fr); }
   .detail-grid { grid-template-columns: minmax(0, 1fr); }
   .calendar-layout { grid-template-columns: minmax(0, 1fr); }
   .week-board { overflow-x: auto; }
